@@ -43,6 +43,18 @@ func (r *LightRenderer) restoreTerminal() {
 	terminal.Restore(r.fd(), r.origState)
 }
 
+func (r *LightRenderer) updateTerminalSize() {
+	width, height, err := terminal.GetSize(r.fd())
+
+	if err == nil {
+		r.width = width
+		r.height = r.maxHeightFunc(height)
+	} else {
+		r.width = getEnv("COLUMNS", defaultWidth)
+		r.height = r.maxHeightFunc(getEnv("LINES", defaultHeight))
+	}
+}
+
 func (r *LightRenderer) findOffset() (row int, col int) {
 	r.csi("6n")
 	r.flush()

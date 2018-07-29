@@ -83,13 +83,25 @@ func (r *LightRenderer) restoreTerminal() {
 	terminal.Restore(r.fd(), r.origState)
 }
 
+func (r *LightRenderer) updateTerminalSize() {
+	var bufferInfo windows.ConsoleScreenBufferInfo
+	if err := windows.GetConsoleScreenBufferInfo(windows.Stdout, &bufferInfo); err != nil {
+		r.width = getEnv("COLUMNS", defaultWidth)
+		r.height = r.maxHeightFunc(getEnv("LINES", defaultHeight))
+
+	} else {
+		r.width = int(bufferInfo.Window.Right - bufferInfo.Window.Left)
+		r.height = r.maxHeightFunc(int(bufferInfo.Window.Bottom - bufferInfo.Window.Top))
+		fmt.Printf("w %d h %d", r.width, r.height)
+	}
+}
+
 func (r *LightRenderer) findOffset() (row int, col int) {
 	var bufferInfo windows.ConsoleScreenBufferInfo
 	if err := windows.GetConsoleScreenBufferInfo(windows.Stdout, &bufferInfo); err != nil {
 		return -1, -1
-	} else {
-		return int(bufferInfo.CursorPosition.X), int(bufferInfo.CursorPosition.Y)
 	}
+	return int(bufferInfo.CursorPosition.X), int(bufferInfo.CursorPosition.Y)
 }
 
 func (r *LightRenderer) getch(nonblock bool) (int, bool) {

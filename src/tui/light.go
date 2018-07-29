@@ -259,22 +259,6 @@ func getEnv(name string, defaultValue int) int {
 	return atoi(env, defaultValue)
 }
 
-func (r *LightRenderer) updateTerminalSize() {
-	termFd := r.fd()
-	if util.IsWindows() {
-		termFd = r.fdOut()
-	}
-	width, height, err := terminal.GetSize(termFd)
-
-	if err == nil {
-		r.width = width
-		r.height = r.maxHeightFunc(height)
-	} else {
-		r.width = getEnv("COLUMNS", defaultWidth)
-		r.height = r.maxHeightFunc(getEnv("LINES", defaultHeight))
-	}
-}
-
 func (r *LightRenderer) getBytes() []byte {
 	return r.getBytesInternal(r.buffer, false)
 }
