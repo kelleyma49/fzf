@@ -70,7 +70,7 @@ func openTtyIn() *os.File {
 	in, err := os.OpenFile("CONIN$", syscall.O_RDWR, 0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
-		util.Exit(2)
+		os.Exit(2)
 	}
 	return in
 }

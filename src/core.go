@@ -27,6 +27,7 @@ package fzf
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/junegunn/fzf/src/util"
@@ -52,7 +53,7 @@ func Run(opts *Options, revision string) {
 		} else {
 			fmt.Println(version)
 		}
-		util.Exit(exitOk)
+		os.Exit(exitOk)
 	}
 
 	// Event channel
@@ -178,9 +179,9 @@ func Run(opts *Options, revision string) {
 			}
 		}
 		if found {
-			util.Exit(exitOk)
+			os.Exit(exitOk)
 		}
-		util.Exit(exitNoMatch)
+		os.Exit(exitNoMatch)
 	}
 
 	// Synchronous search
@@ -261,9 +262,9 @@ func Run(opts *Options, revision string) {
 										opts.Printer(val.Get(i).item.AsString(opts.Ansi))
 									}
 									if count > 0 {
-										util.Exit(exitOk)
+										os.Exit(exitOk)
 									}
-									util.Exit(exitNoMatch)
+									os.Exit(exitNoMatch)
 								}
 								deferred = false
 								terminal.startChan <- true

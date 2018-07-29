@@ -253,12 +253,12 @@ func defaultOptions() *Options {
 
 func help(code int) {
 	os.Stderr.WriteString(usage)
-	util.Exit(code)
+	os.Exit(code)
 }
 
 func errorExit(msg string) {
 	os.Stderr.WriteString(msg + "\n")
-	util.Exit(exitError)
+	os.Exit(exitError)
 }
 
 func optString(arg string, prefixes ...string) (bool, string) {

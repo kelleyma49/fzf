@@ -112,25 +112,3 @@ func DurWithin(
 func IsTty() bool {
 	return isatty.IsTerminal(os.Stdin.Fd())
 }
-
-type ExitHandler = func()
-
-var (
-	ExitHandlers []ExitHandler
-)
-
-func AddExitHandler(handler ExitHandler) {
-	ExitHandlers = append(ExitHandlers, handler)
-}
-
-func RunExitHandlers() {
-	for _, eh := range ExitHandlers {
-		eh()
-	}
-}
-
-// Exit wraps normal exit to execute cleanup routines
-func Exit(code int) {
-	RunExitHandlers()
-	os.Exit(code)
-}
