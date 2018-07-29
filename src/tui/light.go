@@ -29,25 +29,9 @@ const consoleDevice string = "/dev/tty"
 
 var offsetRegexp *regexp.Regexp = regexp.MustCompile("\x1b\\[([0-9]+);([0-9]+)R")
 
-func openTtyIn() *os.File {
-	//in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
-	in, err := os.OpenFile("CONIN$", syscall.O_RDONLY, 0)
-	if err != nil {
-		tty := ttyname()
-		if len(tty) > 0 {
-			if in, err := os.OpenFile(tty, syscall.O_RDONLY, 0); err == nil {
-				return in
-			}
-		}
-		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
-		util.Exit(2)
-	}
-	return in
-}
-
 func openTtyOut() *os.File {
 	//in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
-	in, err := os.OpenFile("CONOUT$", syscall.O_WRONLY, 0)
+	in, err := os.OpenFile("CONOUT$", syscall.O_RDWR, 0)
 	if err != nil {
 		tty := ttyname()
 		if len(tty) > 0 {
@@ -174,20 +158,6 @@ func (r *LightRenderer) defaultTheme() *ColorTheme {
 	return Default16
 }
 
-func (r *LightRenderer) findOffset() (row int, col int) {
-	r.csi("6n")
-	r.flush()
-	bytes := []byte{}
-	for tries := 0; tries < offsetPollTries; tries++ {
-		bytes = r.getBytesInternal(bytes, tries > 0)
-		offsets := offsetRegexp.FindSubmatch(bytes)
-		if len(offsets) > 2 {
-			return atoi(string(offsets[1]), 0) - 1, atoi(string(offsets[2]), 0) - 1
-		}
-	}
-	return -1, -1
-}
-
 func repeat(s string, times int) string {
 	if times > 0 {
 		return strings.Repeat(s, times)
@@ -212,7 +182,6 @@ func (r *LightRenderer) Init() {
 		errorExit(err.Error())
 	}
 	r.origState = origState
-	terminal.MakeRaw(fd)
 	if err := r.initPlatform(); err != nil {
 		errorExit(err.Error())
 	}
@@ -590,7 +559,7 @@ func (r *LightRenderer) rmcup() {
 }
 
 func (r *LightRenderer) Pause(clear bool) {
-	terminal.Restore(r.fd(), r.origState)
+	r.restoreTerminal()
 	if clear {
 		if r.fullscreen {
 			r.rmcup()
@@ -603,7 +572,7 @@ func (r *LightRenderer) Pause(clear bool) {
 }
 
 func (r *LightRenderer) Resume(clear bool) {
-	terminal.MakeRaw(r.fd())
+	r.setupTerminal()
 	if clear {
 		if r.fullscreen {
 			r.smcup()
@@ -659,7 +628,7 @@ func (r *LightRenderer) Close() {
 		r.csi("?1000l")
 	}
 	r.flush()
-	terminal.Restore(r.fd(), r.origState)
+	r.restoreTerminal()
 }
 
 func (r *LightRenderer) MaxX() int {

@@ -3,7 +3,12 @@
 package tui
 
 import (
+	"fmt"
+	"os"
+	"syscall"
+
 	"github.com/junegunn/fzf/src/util"
+	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/sys/windows"
 )
 
@@ -20,18 +25,19 @@ func (r *LightRenderer) initPlatform() error {
 		}
 		//var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.DISABLE_NEWLINE_AUTO_RETURN
 		//var requestedOutModes uint32 = oldStateOutput | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.ENABLE_LINE_INPUT | windows.ENABLE_PROCESSED_OUTPUT
-		var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.ENABLE_PROCESSED_OUTPUT | windows.DISABLE_NEWLINE_AUTO_RETURN
+		var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.ENABLE_PROCESSED_OUTPUT /*| windows.DISABLE_NEWLINE_AUTO_RETURN*/
 		if err := windows.SetConsoleMode(con, requestedOutModes); err != nil {
 			return err
 		}
 	}
 
 	inHandle := windows.Stdin
-	if err := windows.GetConsoleMode(inHandle, &oldStateInput); err != nil {
+	//inHandle, _ := syscall.Open("CONIN$", syscall.O_RDWR, 0)
+	if err := windows.GetConsoleMode(windows.Handle(inHandle), &oldStateInput); err != nil {
 		return err
 	}
-	var requestedInModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_INPUT | windows.ENABLE_PROCESSED_INPUT
-	if err := windows.SetConsoleMode(inHandle, requestedInModes); err != nil {
+	var requestedInModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_INPUT | windows.ENABLE_PROCESSED_INPUT | windows.ENABLE_WINDOW_INPUT | windows.ENABLE_MOUSE_INPUT | windows.ENABLE_EXTENDED_FLAGS
+	if err := windows.SetConsoleMode(windows.Handle(inHandle), requestedInModes); err != nil {
 		return err
 	}
 
@@ -58,6 +64,32 @@ func (r *LightRenderer) initPlatform() error {
 func (r *LightRenderer) closePlatform() {
 	windows.SetConsoleMode(windows.Stderr, oldStateOutput)
 	windows.SetConsoleMode(windows.Stdin, oldStateInput)
+}
+
+func openTtyIn() *os.File {
+	in, err := os.OpenFile("CONIN$", syscall.O_RDWR, 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
+		util.Exit(2)
+	}
+	return in
+}
+
+func (r *LightRenderer) setupTerminal() {
+	terminal.MakeRaw(r.fd())
+}
+
+func (r *LightRenderer) restoreTerminal() {
+	terminal.Restore(r.fd(), r.origState)
+}
+
+func (r *LightRenderer) findOffset() (row int, col int) {
+	var bufferInfo windows.ConsoleScreenBufferInfo
+	if err := windows.GetConsoleScreenBufferInfo(windows.Stdout, &bufferInfo); err != nil {
+		return -1, -1
+	} else {
+		return int(bufferInfo.CursorPosition.X), int(bufferInfo.CursorPosition.Y)
+	}
 }
 
 func (r *LightRenderer) getch(nonblock bool) (int, bool) {

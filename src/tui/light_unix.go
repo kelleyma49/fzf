@@ -2,14 +2,59 @@
 
 package tui
 
-import "github.com/junegunn/fzf/src/util"
+import (
+	"fmt"
+	"os"
+	"syscall"
+
+	"github.com/junegunn/fzf/src/util"
+	"golang.org/x/crypto/ssh/terminal"
+)
 
 func (r *LightRenderer) initPlatform() error {
+	terminal.MakeRaw(r.fd())
 	return nil
 }
 
 func (r *LightRenderer) closePlatform() {
 	// NOOP
+}
+
+func openTtyIn() *os.File {
+	in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
+	if err != nil {
+		tty := ttyname()
+		if len(tty) > 0 {
+			if in, err := os.OpenFile(tty, syscall.O_RDONLY, 0); err == nil {
+				return in
+			}
+		}
+		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
+		util.Exit(2)
+	}
+	return in
+}
+
+func (r *LightRenderer) setupTerminal() {
+	terminal.MakeRaw(r.fd())
+}
+
+func (r *LightRenderer) restoreTerminal() {
+	terminal.Restore(r.fd(), r.origState)
+}
+
+func (r *LightRenderer) findOffset() (row int, col int) {
+	r.csi("6n")
+	r.flush()
+	bytes := []byte{}
+	for tries := 0; tries < offsetPollTries; tries++ {
+		bytes = r.getBytesInternal(bytes, tries > 0)
+		offsets := offsetRegexp.FindSubmatch(bytes)
+		if len(offsets) > 2 {
+			return atoi(string(offsets[1]), 0) - 1, atoi(string(offsets[2]), 0) - 1
+		}
+	}
+	return -1, -1
 }
 
 func (r *LightRenderer) getch(nonblock bool) (int, bool) {
