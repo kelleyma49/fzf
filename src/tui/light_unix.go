@@ -11,6 +11,10 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+func LightRendererSupported() bool {
+	return true
+}
+
 func (r *LightRenderer) initPlatform() error {
 	terminal.MakeRaw(r.fd())
 	return nil

@@ -17,7 +17,20 @@ var (
 	oldStateOutput uint32
 )
 
+// IsLightRendererSupported checks to see if the Light renderer is supported
+func IsLightRendererSupported() bool {
+	var oldState uint32
+	// enable vt100 emulation (https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences)
+	if err := windows.GetConsoleMode(windows.Stderr, &oldState); err != nil {
+		return false
+	}
+	canSetVt100 := windows.SetConsoleMode(windows.Stderr, windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == nil
+	windows.SetConsoleMode(windows.Stderr, oldState)
+	return canSetVt100
+}
+
 func (r *LightRenderer) initPlatform() error {
+	IsLightRendererSupported()
 	for _, con := range [2]windows.Handle{windows.Stderr, windows.Stdout} {
 		// enable vt100 emulation (https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences)
 		if err := windows.GetConsoleMode(con, &oldStateOutput); err != nil {

@@ -10,9 +10,6 @@ import (
 
 	"github.com/junegunn/fzf/src/algo"
 	"github.com/junegunn/fzf/src/tui"
-	"github.com/junegunn/fzf/src/util"
-
-	//"github.com/junegunn/fzf/src/util"
 
 	"github.com/mattn/go-shellwords"
 )
@@ -1250,9 +1247,9 @@ func parseOptions(opts *Options, allArgs []string) {
 }
 
 func postProcessOptions(opts *Options) {
-	//if util.IsWindows() && opts.Height.size > 0 {
-	//	errorExit("--height option is currently not supported on Windows")
-	//}
+	if !tui.IsLightRendererSupported() && opts.Height.size > 0 {
+		errorExit("--height option is currently not supported on platform")
+	}
 	// Default actions for CTRL-N / CTRL-P when --history is set
 	if opts.History != nil {
 		if _, prs := opts.Keymap[tui.CtrlP]; !prs {
