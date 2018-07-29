@@ -161,6 +161,9 @@ func (r *LightRenderer) fdOut() int {
 }
 
 func (r *LightRenderer) defaultTheme() *ColorTheme {
+	if util.IsWindows() && os.Getenv("ConEmuANSI") == "ON" {
+		return Dark256
+	}
 	if strings.Contains(os.Getenv("TERM"), "256") {
 		return Dark256
 	}
@@ -208,11 +211,11 @@ func (r *LightRenderer) Init() {
 	if err != nil {
 		errorExit(err.Error())
 	}
+	r.origState = origState
+	terminal.MakeRaw(fd)
 	if err := r.initPlatform(); err != nil {
 		errorExit(err.Error())
 	}
-	r.origState = origState
-	terminal.MakeRaw(fd)
 	r.updateTerminalSize()
 	initTheme(r.theme, r.defaultTheme(), r.forceBlack)
 

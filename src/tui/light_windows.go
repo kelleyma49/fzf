@@ -13,6 +13,27 @@ var (
 )
 
 func (r *LightRenderer) initPlatform() error {
+	for _, con := range [2]windows.Handle{windows.Stderr, windows.Stdout} {
+		// enable vt100 emulation (https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences)
+		if err := windows.GetConsoleMode(con, &oldStateOutput); err != nil {
+			return err
+		}
+		//var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.DISABLE_NEWLINE_AUTO_RETURN
+		//var requestedOutModes uint32 = oldStateOutput | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.ENABLE_LINE_INPUT | windows.ENABLE_PROCESSED_OUTPUT
+		var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.ENABLE_PROCESSED_OUTPUT | windows.DISABLE_NEWLINE_AUTO_RETURN
+		if err := windows.SetConsoleMode(con, requestedOutModes); err != nil {
+			return err
+		}
+	}
+
+	inHandle := windows.Stdin
+	if err := windows.GetConsoleMode(inHandle, &oldStateInput); err != nil {
+		return err
+	}
+	var requestedInModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_INPUT | windows.ENABLE_PROCESSED_INPUT
+	if err := windows.SetConsoleMode(inHandle, requestedInModes); err != nil {
+		return err
+	}
 
 	// channel for non-blocking reads:
 	r.ttyinChannel = make(chan byte)
@@ -30,26 +51,6 @@ func (r *LightRenderer) initPlatform() error {
 			}
 		}
 	}()
-
-	for _, con := range [2]windows.Handle{windows.Stderr, windows.Stdout} {
-		// enable vt100 emulation (https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences)
-		if err := windows.GetConsoleMode(con, &oldStateOutput); err != nil {
-			return err
-		}
-		//var requestedOutModes uint32 = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.DISABLE_NEWLINE_AUTO_RETURN
-		var requestedOutModes uint32 = (oldStateOutput | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING | windows.DISABLE_NEWLINE_AUTO_RETURN) | windows.ENABLE_LINE_INPUT
-		if err := windows.SetConsoleMode(con, requestedOutModes); err != nil {
-			return err
-		}
-	}
-
-	if err := windows.GetConsoleMode(windows.Stdin, &oldStateInput); err != nil {
-		return err
-	}
-	var requestedInModes uint32 = oldStateInput | windows.ENABLE_VIRTUAL_TERMINAL_INPUT
-	if err := windows.SetConsoleMode(windows.Stdin, requestedInModes); err != nil {
-		return err
-	}
 
 	return nil
 }
