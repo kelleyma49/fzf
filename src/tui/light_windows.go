@@ -92,7 +92,6 @@ func (r *LightRenderer) updateTerminalSize() {
 	} else {
 		r.width = int(bufferInfo.Window.Right - bufferInfo.Window.Left)
 		r.height = r.maxHeightFunc(int(bufferInfo.Window.Bottom - bufferInfo.Window.Top))
-		fmt.Printf("w %d h %d", r.width, r.height)
 	}
 }
 
