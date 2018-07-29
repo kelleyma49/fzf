@@ -1482,7 +1482,7 @@ func (t *Terminal) Loop() {
 			t.history.append(string(t.input))
 		}
 		// prof.Stop()
-		os.Exit(code)
+		util.Exit(code)
 	}
 
 	go func() {

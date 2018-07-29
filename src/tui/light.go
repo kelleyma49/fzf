@@ -30,7 +30,8 @@ const consoleDevice string = "/dev/tty"
 var offsetRegexp *regexp.Regexp = regexp.MustCompile("\x1b\\[([0-9]+);([0-9]+)R")
 
 func openTtyIn() *os.File {
-	in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
+	//in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
+	in, err := os.OpenFile("CONIN$", syscall.O_RDONLY, 0)
 	if err != nil {
 		tty := ttyname()
 		if len(tty) > 0 {
@@ -39,7 +40,23 @@ func openTtyIn() *os.File {
 			}
 		}
 		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
-		os.Exit(2)
+		util.Exit(2)
+	}
+	return in
+}
+
+func openTtyOut() *os.File {
+	//in, err := os.OpenFile(consoleDevice, syscall.O_RDONLY, 0)
+	in, err := os.OpenFile("CONOUT$", syscall.O_WRONLY, 0)
+	if err != nil {
+		tty := ttyname()
+		if len(tty) > 0 {
+			if in, err := os.OpenFile(tty, syscall.O_RDONLY, 0); err == nil {
+				return in
+			}
+		}
+		fmt.Fprintln(os.Stderr, "Failed to open "+consoleDevice)
+		util.Exit(2)
 	}
 	return in
 }
@@ -71,13 +88,6 @@ func (r *LightRenderer) csi(code string) {
 	r.stderr("\x1b[" + code)
 }
 
-func (r *LightRenderer) flush() {
-	if len(r.queued) > 0 {
-		fmt.Fprint(os.Stderr, r.queued)
-		r.queued = ""
-	}
-}
-
 // Light renderer
 type LightRenderer struct {
 	theme         *ColorTheme
@@ -87,6 +97,8 @@ type LightRenderer struct {
 	prevDownTime  time.Time
 	clickY        []int
 	ttyin         *os.File
+	ttyout        *os.File
+	ttyinChannel  chan byte
 	buffer        []byte
 	origState     *terminal.State
 	width         int
@@ -124,6 +136,7 @@ func NewLightRenderer(theme *ColorTheme, forceBlack bool, mouse bool, tabstop in
 		mouse:         mouse,
 		clearOnExit:   clearOnExit,
 		ttyin:         openTtyIn(),
+		ttyout:        openTtyOut(),
 		yoffset:       0,
 		tabstop:       tabstop,
 		fullscreen:    fullscreen,
@@ -134,6 +147,10 @@ func NewLightRenderer(theme *ColorTheme, forceBlack bool, mouse bool, tabstop in
 
 func (r *LightRenderer) fd() int {
 	return int(r.ttyin.Fd())
+}
+
+func (r *LightRenderer) fdOut() int {
+	return int(r.ttyout.Fd())
 }
 
 func (r *LightRenderer) defaultTheme() *ColorTheme {
@@ -180,6 +197,7 @@ func (r *LightRenderer) Init() {
 	r.escDelay = atoi(os.Getenv("ESCDELAY"), defaultEscDelay)
 
 	fd := r.fd()
+	r.InitPlatform()
 	origState, err := terminal.GetState(fd)
 	if err != nil {
 		errorExit(err.Error())
@@ -189,6 +207,20 @@ func (r *LightRenderer) Init() {
 	r.updateTerminalSize()
 	initTheme(r.theme, r.defaultTheme(), r.forceBlack)
 
+	// channel for non-blocking reads:
+	r.ttyinChannel = make(chan byte)
+
+	go func() {
+		for {
+			fd := r.fd()
+			b := make([]byte, 1)
+			_, err := util.Read(fd, b)
+			if err == nil {
+				//	break
+				r.ttyinChannel <- b[0]
+			}
+		}
+	}()
 	if r.fullscreen {
 		r.smcup()
 	} else {
@@ -198,6 +230,7 @@ func (r *LightRenderer) Init() {
 			r.csi("J")
 		}
 		y, x := r.findOffset()
+		//y, x := -1, -1
 		r.mouse = r.mouse && y >= 0
 		// When --no-clear is used for repetitive relaunching, there is a small
 		// time frame between fzf processes where the user keystrokes are not
@@ -223,6 +256,7 @@ func (r *LightRenderer) Init() {
 	}
 	if !r.fullscreen && r.mouse {
 		r.yoffset, _ = r.findOffset()
+		//r.yoffset = -1
 	}
 }
 
@@ -259,7 +293,8 @@ func getEnv(name string, defaultValue int) int {
 }
 
 func (r *LightRenderer) updateTerminalSize() {
-	width, height, err := terminal.GetSize(r.fd())
+	//width, height, err := terminal.GetSize(r.fd())
+	width, height, err := terminal.GetSize(r.fdOut())
 	if err == nil {
 		r.width = width
 		r.height = r.maxHeightFunc(height)
@@ -270,14 +305,29 @@ func (r *LightRenderer) updateTerminalSize() {
 }
 
 func (r *LightRenderer) getch(nonblock bool) (int, bool) {
-	b := make([]byte, 1)
-	fd := r.fd()
-	util.SetNonblock(r.ttyin, nonblock)
-	_, err := util.Read(fd, b)
-	if err != nil {
-		return 0, false
+	//b := make([]byte, 1)
+	//fd := r.fd()
+	//util.SetNonblock(r.ttyin, nonblock)
+	if nonblock {
+		select {
+		case bc := <-r.ttyinChannel:
+			//fmt.Println("nonblock:", bc)
+			return int(bc), true
+		default:
+			//fmt.Println("default 0")
+			return 0, false
+		}
+	} else {
+		bc := <-r.ttyinChannel
+		//fmt.Println("block:", bc)
+		return int(bc), true
 	}
-	return int(b[0]), true
+
+	//_, err := util.Read(fd, b)
+	//if err != nil {
+	//	return 0, false
+	//}
+	//return int(b[0]), true
 }
 
 func (r *LightRenderer) getBytes() []byte {
@@ -613,6 +663,8 @@ func (r *LightRenderer) Refresh() {
 }
 
 func (r *LightRenderer) Close() {
+	r.ClosePlatform()
+
 	// r.csi("u")
 	if r.clearOnExit {
 		if r.fullscreen {

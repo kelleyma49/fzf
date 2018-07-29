@@ -12,6 +12,8 @@ import (
 	"github.com/junegunn/fzf/src/tui"
 	"github.com/junegunn/fzf/src/util"
 
+	//"github.com/junegunn/fzf/src/util"
+
 	"github.com/mattn/go-shellwords"
 )
 
@@ -251,12 +253,12 @@ func defaultOptions() *Options {
 
 func help(code int) {
 	os.Stderr.WriteString(usage)
-	os.Exit(code)
+	util.Exit(code)
 }
 
 func errorExit(msg string) {
 	os.Stderr.WriteString(msg + "\n")
-	os.Exit(exitError)
+	util.Exit(exitError)
 }
 
 func optString(arg string, prefixes ...string) (bool, string) {
@@ -1248,9 +1250,9 @@ func parseOptions(opts *Options, allArgs []string) {
 }
 
 func postProcessOptions(opts *Options) {
-	if util.IsWindows() && opts.Height.size > 0 {
-		errorExit("--height option is currently not supported on Windows")
-	}
+	//if util.IsWindows() && opts.Height.size > 0 {
+	//	errorExit("--height option is currently not supported on Windows")
+	//}
 	// Default actions for CTRL-N / CTRL-P when --history is set
 	if opts.History != nil {
 		if _, prs := opts.Keymap[tui.CtrlP]; !prs {

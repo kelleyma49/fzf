@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/junegunn/fzf/src/util"
 )
 
 // Types of user action
@@ -304,7 +306,7 @@ func EmptyTheme() *ColorTheme {
 
 func errorExit(message string) {
 	fmt.Fprintln(os.Stderr, message)
-	os.Exit(2)
+	util.Exit(2)
 }
 
 func init() {
